@@ -1,0 +1,264 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin - API Key Management</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 18px;
+      background: #f0f2f5; 
+      color: #333;
+    }
+    .wrap {
+      max-width: 1200px; 
+      margin: 20px auto;
+    }
+    h2, h3 {
+      color: #1a202c; 
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .small {
+      font-size: 13px;
+      color: #718096;
+    }
+    
+
+    input, select {
+      padding: 10px;
+      margin: 6px 0;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px; 
+      transition: all 0.3s ease;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+      font-size: 15px;
+    }
+    input:focus, select:focus {
+      border-color: #4c51bf;
+      box-shadow: 0 0 0 3px rgba(76, 81, 191, 0.2);
+      outline: none;
+    }
+    button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 0;
+      background: #4c51bf; 
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.1s ease;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #3c4196;
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    /* Button Logout */
+    #logoutBtn, .delBtn {
+      background: #e53e3e !important;
+    }
+    #logoutBtn:hover, .delBtn:hover {
+      background: #c53030 !important;
+    }
+    
+
+    .user-card {
+      background: white;
+      border-radius: 12px; 
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); 
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: box-shadow 0.3s ease;
+    }
+    .user-card:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+    }
+    .user-info {
+      font-size: 1.1em;
+      font-weight: 700;
+      margin-bottom: 15px;
+      color: #2d3748;
+    }
+    
+
+    .key-table {
+      width: 100%;
+      border-collapse: separate; /* Gunakan separate untuk border-radius */
+      border-spacing: 0;
+      background: #f7fafc;
+      border-radius: 8px;
+      overflow: hidden; /* Penting agar border-radius berfungsi */
+    }
+    .key-table th, .key-table td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .key-table th {
+      background-color: #ebf4ff; /* Latar belakang header yang berbeda */
+      color: #2b6cb0;
+      text-align: left;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.85em;
+    }
+    .key-table tr:last-child td {
+      border-bottom: none; /* Hilangkan border di baris terakhir */
+    }
+    .key-table tr:hover {
+      background-color: #f7f9fb;
+    }
+    
+    /* Status styling */
+    .status-active { color: #38a169; font-weight: 600; }
+    .status-inactive { color: #e53e3e; font-weight: 600; }
+    
+    /* Key value break */
+    .key-value-cell {
+      max-width: 450px;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: #4a5568;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Admin Dashboard</h2>
+    
+    <div id="loginBox">
+      <input id="adminEmail" placeholder="Email"><br>
+      <input id="adminPassword" placeholder="Password" type="password"><br>
+      <button id="loginBtn">Login</button>
+      <div id="loginMsg" class="small" style="margin-top: 10px;"></div>
+    </div>
+
+    <div id="dashboard" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center; margin-bottom: 20px;">
+        <h3 style="margin: 0; border: none; padding: 0;">API Key Management</h3>
+        <button id="logoutBtn">Logout</button>
+      </div>
+
+      <div id="usersArea"></div>
+    </div>
+  </div>
+
+  <script>
+    let logged = false;
+    const loginBox = document.getElementById('loginBox');
+    const dashboard = document.getElementById('dashboard');
+    const loginMsg = document.getElementById('loginMsg');
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const email = document.getElementById('adminEmail').value;
+      const password = document.getElementById('adminPassword').value;
+      loginMsg.textContent = '';
+      try {
+        const res = await fetch('/admin/login', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({email, password})
+        });
+        const data = await res.json();
+        if (data.success) { showDashboard(); }
+        else loginMsg.textContent = 'Login gagal';
+      } catch (e) { loginMsg.textContent='Server error'; }
+    });
+
+    async function showDashboard() {
+      loginBox.style.display = 'none';
+      dashboard.style.display = 'block';
+      await loadUsers();
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/admin/logout');
+      loginBox.style.display = 'block';
+      dashboard.style.display = 'none';
+    });
+
+    async function loadUsers() {
+      const res = await fetch('/admin/users');
+      if (res.status === 401) { alert('Login required'); return; }
+      const users = await res.json();
+      const area = document.getElementById('usersArea');
+      area.innerHTML = '';
+      if (users.length === 0) { area.innerHTML = '<div class="user-card">No users found.</div>'; return; }
+      
+      users.forEach(u => {
+        const div = document.createElement('div');
+        div.className = 'user-card'; // Menggunakan class card
+        
+        let html = `<div class="user-info">${u.first_name} ${u.last_name} (${u.email})</div>
+                    <table class="key-table">
+                      <thead>
+                        <tr>
+                          <th>API Key</th>
+                          <th>Expires</th>
+                          <th>Status</th>
+                          <th style="width: 150px;">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>`;
+
+        if (u.keys.length === 0) {
+          html += '<tr><td colspan="4">No API Key registered for this user.</td></tr>';
+        } else {
+          u.keys.forEach(k => {
+            const statusClass = k.status === 'active' ? 'status-active' : 'status-inactive';
+            
+            html += `<tr>
+              <td class="key-value-cell">${k.key_value}</td>
+              <td>${new Date(k.out_of_date).toLocaleDateString()}</td>
+              <td class="${statusClass}">${k.status.toUpperCase()}</td>
+              <td>
+                <select data-keyid="${k.key_id}" class="statusSel">
+                  <option value="active"${k.status==='active'?' selected':''}>Active</option>
+                  <option value="inactive"${k.status==='inactive'?' selected':''}>Inactive</option>
+                </select>
+                <button data-keyid="${k.key_id}" class="saveBtn" style="margin-left: 5px;">Save</button>
+                <button data-keyid="${k.key_id}" class="delBtn" style="margin-left: 5px;">Del</button>
+              </td>
+            </tr>`;
+          });
+        }
+        
+        html += '</tbody></table>';
+        div.innerHTML = html;
+        area.appendChild(div);
+      });
+
+      
+      document.querySelectorAll('.saveBtn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const key_id = btn.getAttribute('data-keyid');
+          const sel = document.querySelector(`.statusSel[data-keyid="${key_id}"]`);
+          const status = sel.value;
+          await fetch('/admin/update-key', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key_id, status }) });
+          alert('Status updated successfully!');
+          await loadUsers();
+        });
+      });
+      document.querySelectorAll('.delBtn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          if (!confirm('Are you sure you want to delete this key?')) return;
+          const key_id = btn.getAttribute('data-keyid');
+          await fetch('/admin/delete-key', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key_id }) });
+          alert('Key deleted successfully!');
+          await loadUsers();
+        });
+      });
+    }
+
+    // Cek status login saat halaman dimuat
+    if (document.cookie.includes('connect.sid')) { // Mengandalkan cookie session
+        showDashboard();
+    }
+  </script>
+</body>
+</html>
