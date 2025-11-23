@@ -1,0 +1,199 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Create API Key - User</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    /* Global Styles */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 24px;
+      background: #f0f2f5; /* Latar belakang abu-abu terang */
+      color: #333;
+    }
+    
+    /* Card/Container Styles (Lebih mewah) */
+    .card {
+      max-width: 500px; 
+      margin: 50px auto; 
+      padding: 30px; /* Padding lebih besar */
+      background: #fff;
+      border-radius: 16px; /* Sudut lebih membulat */
+      /* Box Shadow yang elegan */
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+    }
+    
+    h2 {
+      color: #1a202c;
+      margin-top: 0;
+      margin-bottom: 25px;
+      font-weight: 600;
+    }
+    
+    /* Input Styles */
+    input {
+      width: 100%;
+      padding: 12px; /* Padding lebih besar */
+      margin: 12px 0;
+      border-radius: 8px;
+      border: 1px solid #cbd5e0;
+      transition: all 0.3s ease;
+      font-size: 15px;
+    }
+    input:focus {
+      border-color: #4c51bf;
+      box-shadow: 0 0 0 3px rgba(76, 81, 191, 0.2);
+      outline: none;
+    }
+    
+    /* Button Styles */
+    button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 0;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s ease, transform 0.1s ease;
+    }
+    
+    /* Primary Button: Create API Key (Indigo) */
+    #createBtn {
+      background: #4c51bf;
+    }
+    #createBtn:hover {
+      background: #3c4196;
+    }
+
+    /* Secondary Button: Save (Green) */
+    #saveBtn {
+      background: #38a169 !important; /* Hijau yang lebih dalam */
+      margin-left: 10px;
+    }
+    #saveBtn:hover {
+      background: #2f855a !important;
+    }
+
+    /* Copy Button */
+    #copyBtn {
+      background: #f7fafc !important;
+      color: #2d3748 !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    #copyBtn:hover {
+      background: #e2e8f0 !important;
+    }
+
+    .muted {
+      color: #718096;
+      font-size: 14px;
+    }
+    
+    /* API Key Display Area (Code Block) */
+    #keyText {
+      background: #f7fafc; 
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px dashed #e2e8f0;
+      overflow: auto;
+      font-family: monospace;
+      color: #4a5568;
+      font-size: 0.9em;
+      word-break: break-all;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #e2e8f0;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Create API Key</h2>
+    
+    <input id="first_name" placeholder="First name">
+    <input id="last_name" placeholder="Last name">
+    <input id="email" placeholder="Email">
+    
+    <div style="margin:15px 0 20px 0">
+      <button id="createBtn">Generate API Key</button>
+      <button id="saveBtn">Save</button>
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <label class="muted">Generated Key:</label>
+      <pre id="keyText">No key yet</pre>
+      <div style="margin-top:10px; text-align: right;">
+        <button id="copyBtn">Copy Key</button>
+      </div>
+    </div>
+
+    <div id="msg" class="muted" style="margin-top:10px"></div>
+    <hr>
+    
+    <div class="muted">Admin dashboard: <a href="/admin.html" style="color:#4c51bf; text-decoration: none; font-weight: 600;">Admin</a></div>
+  </div>
+
+  <script>
+    const createBtn = document.getElementById('createBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const keyText = document.getElementById('keyText');
+    const msg = document.getElementById('msg');
+
+    createBtn.addEventListener('click', async () => {
+      msg.textContent = '';
+      try {
+        const res = await fetch('/api/generate-key');
+        const data = await res.json();
+        if (data.success) {
+            keyText.textContent = data.key;
+            msg.textContent = 'Key berhasil di-generate. Jangan lupa klik Save!';
+        }
+        else msg.textContent = 'Gagal generate key';
+      } catch (e) { msg.textContent = 'Tidak bisa hubungi server'; }
+    });
+
+    copyBtn.addEventListener('click', () => {
+      if (keyText.textContent === 'No key yet') { msg.textContent = 'Generate dulu key sebelum meng-copy!'; return; }
+      navigator.clipboard.writeText(keyText.textContent).then(()=> {
+          msg.textContent = 'API Key berhasil disalin ke clipboard!';
+          setTimeout(() => msg.textContent = '', 2000);
+      });
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const first_name = document.getElementById('first_name').value.trim();
+      const last_name = document.getElementById('last_name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const key = keyText.textContent;
+      
+      if (!first_name || !last_name || !email) { msg.textContent='⚠️ Isi semua field (First name, Last name, Email).'; return; }
+      if (!key || key === 'No key yet') { msg.textContent='⚠️ Generate dulu API Key sebelum menyimpan.'; return; }
+      
+      try {
+        const res = await fetch('/api/save-user', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ first_name, last_name, email, key })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          msg.textContent = '✅ API Key dan User berhasil disimpan!';
+          // Bersihkan form
+          document.getElementById('first_name').value='';
+          document.getElementById('last_name').value='';
+          document.getElementById('email').value='';
+          keyText.textContent = 'No key yet';
+          
+          setTimeout(() => msg.textContent = '', 3000); // Hapus pesan setelah 3 detik
+        } else msg.textContent = data.message || '❌ Gagal menyimpan data.';
+      } catch (e) { msg.textContent = '❌ Gagal menyimpan - server error'; }
+    });
+  </script>
+</body>
+</html>
