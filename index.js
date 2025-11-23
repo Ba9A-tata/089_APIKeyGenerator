@@ -93,3 +93,20 @@ app.post('/api/save-user', async (req, res) => {
   }
 });
 
+// validate key
+app.post('/api/validate-key', async (req, res) => {
+  const { key } = req.body;
+  if (!key) return res.status(400).json({ valid: false, message: 'No key' });
+
+  const [rows] = await db.execute('SELECT key_id, out_of_date, status FROM api_keys WHERE key_value = ? LIMIT 1', [key]);
+  if (rows.length === 0) return res.json({ valid: false, message: 'Key not found' });
+
+  const row = rows[0];
+  if (row.status !== 'active') return res.json({ valid: false, message: 'Key not active' });
+
+  if (new Date(row.out_of_date) < new Date()) return res.json({ valid: false, message: 'Key expired' });
+
+  return res.json({ valid: true });
+});
+
+
