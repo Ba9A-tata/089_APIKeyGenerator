@@ -28,3 +28,68 @@ let db;
   }
 })();
 
+// session (untuk admin)
+app.use(session({
+  secret: 'ganti_dengan_secret_random', // ganti untuk production
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 4 } // 4 jam
+}));
+
+// static files
+app.use('/', express.static(path.join(__dirname, 'public')));
+
+// ----------------- USER endpoints -----------------
+
+app.get('/api/generate-key', (req, res) => {
+  try {
+    const key = crypto.randomBytes(24).toString('hex');
+    return res.json({ success: true, key });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Gagal generate key' });
+  }
+});
+
+// save user + api key
+app.post('/api/save-user', async (req, res) => {
+  const { first_name, last_name, email, key } = req.body;
+  if (!first_name || !last_name || !email || !key) {
+    return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, message: 'Email tidak valid' });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // cek user existing
+    const [rows] = await conn.execute('SELECT user_id FROM users WHERE email = ?', [email]);
+    let user_id;
+    if (rows.length > 0) {
+      user_id = rows[0].user_id;
+      // update name jika perlu
+      await conn.execute('UPDATE users SET first_name = ?, last_name = ?, updated_at = NOW() WHERE user_id = ?', [first_name, last_name, user_id]);
+    } else {
+      const [ins] = await conn.execute('INSERT INTO users (first_name, last_name, email) VALUES (?, ?, ?)', [first_name, last_name, email]);
+      user_id = ins.insertId;
+    }
+
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 hari
+    const expiresSql = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
+
+    await conn.execute('INSERT INTO api_keys (user_id, key_value, out_of_date, status) VALUES (?, ?, ?, ?)', [user_id, key, expiresSql, 'active']);
+
+    await conn.commit();
+    return res.json({ success: true });
+  } catch (e) {
+    await conn.rollback();
+    console.error(e);
+    return res.status(500).json({ success: false, message: 'Gagal menyimpan data' });
+  } finally {
+    conn.release();
+  }
+});
+
